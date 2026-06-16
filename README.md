@@ -38,8 +38,8 @@ Métricas a serem monitoradas:
 * Redução drástica no *Total Blocking Time (TBT)* e melhoria no *Interaction to Next Paint (INP)*.
 
 ## 👨‍💻 Autores
-* Julio Cesar
-* Victor Hugo
+* Julio Cesar Costa Rodrigues
+* Victor Hugo Bernardo da Costa
 
 ---
 *Projeto desenvolvido para o curso de Ciência da Computação - UNICSUL.*
