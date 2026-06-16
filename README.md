@@ -37,9 +37,6 @@ Métricas a serem monitoradas:
 * Estabilidade do *JS Heap Size*.
 * Redução drástica no *Total Blocking Time (TBT)* e melhoria no *Interaction to Next Paint (INP)*.
 
-## 👨‍💻 Autores
-* Julio Cesar Costa Rodrigues
-* Victor Hugo Bernardo da Costa
-
 ---
-*Projeto desenvolvido para o curso de Ciência da Computação - UNICSUL.*
+*Desenvolvido em 2026 por Julio Cesar Costa Rodrigues e Victor Hugo Bernardo da Costa.*  
+*Trabalho de Graduação Interdisciplinar (TGI) - Ciência da Computação (UNICSUL).*
