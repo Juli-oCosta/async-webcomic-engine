@@ -1,0 +1,28 @@
+# .gitignore
+
+# Ambientes Virtuais do Python
+venv/
+.venv/
+env/
+.env
+
+# Arquivos de Cache e Compilados do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Configurações de IDE (VSCode, PyCharm, etc)
+.vscode/
+.idea/
+
+# Lixo de Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Logs e arquivos de banco de dados locais
+*.log
+*.sqlite3
+
+# Pasta de dados brutos de laboratório (Ignora os CSVs para não pesar o repositório, mas mantém a pasta na nuvem)
+docs/benchmarks/raw_data/*.csv

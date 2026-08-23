@@ -1,0 +1,11 @@
+# requirements.txt
+
+# Framework Web e Servidor Assíncrono
+fastapi
+uvicorn[standard]
+
+# Driver Assíncrono do MongoDB
+motor
+
+# Opcional: Para ler variáveis de ambiente futuramente (como credenciais do banco)
+python-dotenv
