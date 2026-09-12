@@ -12,3 +12,7 @@ database = client.webcomics_db
 
 # Seleciona a "tabela" (coleção) onde guardaremos a estrutura das páginas
 comic_collection = database.get_collection("catalogs")
+
+# Para que o MongoDB reconheça as novas tabelas
+chapters_collection = database.get_collection("chapters")
+pages_collection = database.get_collection("pages")
