@@ -3,9 +3,10 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bson import ObjectId
+from httpx import ASGITransport, AsyncClient
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from pymongo.errors import ServerSelectionTimeoutError
+from pymongo.errors import DocumentTooLarge, ServerSelectionTimeoutError
 
 from backend.database import get_database
 from backend.main import app
@@ -113,6 +114,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("secret", response.text)
 
+    def test_oversized_comic_returns_413_without_driver_details(self):
+        self.database.get_collection.return_value.insert_one = AsyncMock(
+            side_effect=DocumentTooLarge("internal document details")
+        )
+        response = self.client.post("/api/comics", json={
+            "title": "Obra", "author": "Julio", "description": "",
+        })
+        self.assertEqual(response.status_code, 413)
+        self.assertNotIn("internal", response.text)
+
     def make_cursor(self, documents):
         cursor = MagicMock()
         cursor.sort.return_value = cursor
@@ -152,6 +163,33 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/api/comics")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("secret", response.text)
+
+
+class ConcurrentRequestTests(unittest.IsolatedAsyncioTestCase):
+    async def test_two_requests_can_wait_for_database_at_the_same_time(self):
+        database = MagicMock()
+        both_started = asyncio.Event()
+        started = 0
+
+        async def insert_one(document):
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            await both_started.wait()
+            return MagicMock(inserted_id=ObjectId())
+
+        database.get_collection.return_value.insert_one = insert_one
+        # Usa a dependência real; só a operação de banco é simulada.
+        with patch.object(app.state, "database", database, create=True):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                payload = {"title": "Teste", "author": "Teste", "description": ""}
+                responses = await asyncio.wait_for(asyncio.gather(
+                    client.post("/api/comics", json=payload),
+                    client.post("/api/comics", json=payload),
+                ), timeout=2)
+        self.assertEqual([response.status_code for response in responses], [201, 201])
+        self.assertEqual(started, 2)
 
 
 class SchemaTests(unittest.TestCase):

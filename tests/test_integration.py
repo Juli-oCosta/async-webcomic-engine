@@ -48,6 +48,12 @@ class MongoIntegrationTests(unittest.TestCase):
                             "title": " ", "author": "Teste", "description": "",
                         }).status_code, 422)
                         self.assertEqual(cleanup_client[database_name].catalogs.count_documents({}), 105)
+                        oversized = client.post("/api/comics", json={
+                            "title": "Documento grande", "author": "Teste",
+                            "description": "x" * (17 * 1024 * 1024),
+                        })
+                        self.assertEqual(oversized.status_code, 413, oversized.text)
+                        self.assertEqual(cleanup_client[database_name].catalogs.count_documents({}), 105)
             finally:
                 # Nome gerado neste teste, nunca recebido de configuração externa.
                 cleanup_client.drop_database(database_name)

@@ -32,6 +32,6 @@ async def database_lifespan(app: FastAPI):
         client.close()
 
 
-def get_database(request: Request):
+async def get_database(request: Request):
     """Dependência das rotas; pode ser substituída nos testes."""
     return request.app.state.database

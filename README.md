@@ -28,6 +28,7 @@ A configuração padrão usa `mongodb://localhost:27017` e o banco `webcomics_db
 - `/api/status`: confirma que o processo da API responde; não verifica o banco.
 - `/api/db-check`: executa um ping real; retorna 200 em sucesso ou 503 em falha/tempo excedido. A espera do ping é limitada a cinco segundos e a resposta não expõe detalhes internos da conexão.
 - `POST /api/comics`: cadastra uma obra validada e retorna 201, com `id` e `mensagem`, preservando o contrato iniciado por Julio.
+- Se o driver rejeitar um documento grande demais, o cadastro retorna 413. Esse tratamento não é um limite de tamanho do corpo HTTP: a requisição ainda é recebida e validada antes da tentativa de gravação.
 - `GET /api/comics`: retorna uma lista de até 100 obras ordenada por `id`. Aceita `limit` entre 1 e 100 e `after` com o ID da última obra recebida, para continuar a leitura sem carregar o catálogo inteiro. Dados inválidos retornam 422; falhas do banco retornam 503.
 - Um cliente MongoDB por ciclo de execução da aplicação, compartilhado entre requisições e fechado no encerramento pelo lifespan do FastAPI.
 - Schemas de obra, capítulo e página com validação de textos obrigatórios, numeração positiva e datas com fuso horário. Campos desconhecidos são rejeitados para detectar erros de digitação.
@@ -70,6 +71,8 @@ Remove-Item Env:RUN_MONGO_TESTS
 ```
 
 O teste de integração cria um banco temporário com nome aleatório, cadastra 105 obras pela API, verifica a leitura em lotes e remove apenas esse banco ao terminar. Não usa `webcomics_db`.
+
+Também verifica a rejeição de um documento grande demais. O teste unitário de concorrência verifica se duas requisições conseguem aguardar operações de banco simultaneamente, com banco simulado; não mede throughput nem demonstra ganho de desempenho.
 
 ## Próximas etapas do TGI
 

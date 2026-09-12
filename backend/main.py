@@ -4,7 +4,7 @@ import logging
 from bson import ObjectId
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from pymongo.errors import PyMongoError
+from pymongo.errors import DocumentTooLarge, PyMongoError
 
 from backend.database import database_lifespan, get_database
 from backend.models import ComicSchema
@@ -51,10 +51,18 @@ async def ping_database(database=Depends(get_database)):
 
 @app.post(
     "/api/comics", status_code=status.HTTP_201_CREATED,
-    responses={503: {"description": "MongoDB indisponível"}},
+    responses={
+        413: {"description": "Documento excede o tamanho aceito pelo MongoDB"},
+        503: {"description": "MongoDB indisponível"},
+    },
 )
 async def create_comic(comic: ComicSchema, database=Depends(get_database)):
-    result = await database.get_collection("catalogs").insert_one(comic.model_dump())
+    try:
+        result = await database.get_collection("catalogs").insert_one(comic.model_dump())
+    except DocumentTooLarge as exc:
+        raise HTTPException(
+            status_code=413, detail="Documento excede o tamanho aceito pelo MongoDB."
+        ) from exc
     return {
         "id": str(result.inserted_id),
         "mensagem": f"A obra '{comic.title}' foi registrada com sucesso na arquitetura!",
