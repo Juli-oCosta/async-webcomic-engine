@@ -9,3 +9,5 @@ motor
 
 # Opcional: Para ler variáveis de ambiente futuramente (como credenciais do banco)
 python-dotenv
+# Validação dos schemas (API do Pydantic 2)
+pydantic>=2,<3

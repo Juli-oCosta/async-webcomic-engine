@@ -1,28 +1,39 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Annotated
 
-# 1. Modelo da Página individual
-class PageSchema(BaseModel):
-    page_number: int
-    image_url: str
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
-# 2. Modelo do Capítulo (Aplicando o Subset Pattern)
-class ChapterSchema(BaseModel):
-    comic_id: str
-    chapter_number: int
-    title: str
-    
-    # SUBSET PATTERN: O banco entregará apenas estas páginas na primeira requisição,
-    # aliviando a rede. O restante será chamado depois pelo Intersection Observer.
-    initial_pages: List[PageSchema] = [] 
-    
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+MediaReference = Text
 
-# 3. Modelo Principal da Obra (Motor Genérico)
-class ComicSchema(BaseModel):
-    title: str
-    author: str
+
+class DomainSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+
+class PageSchema(DomainSchema):
+    page_number: int = Field(ge=1, strict=True)
+    # Referência textual: aceita URL ou caminho relativo do storage.
+    image_url: MediaReference
+
+
+class PageDocumentSchema(PageSchema):
+    """Documento da coleção pages, vinculado ao capítulo."""
+    chapter_id: Text
+
+
+class ChapterSchema(DomainSchema):
+    comic_id: Text
+    chapter_number: int = Field(ge=1, strict=True)
+    title: Text
+    # A quantidade do subconjunto será definida junto das rotas de capítulos.
+    initial_pages: list[PageSchema] = Field(default_factory=list)
+    created_at: AwareDatetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ComicSchema(DomainSchema):
+    title: Text
+    author: Text
     description: str
-    tags: List[str] = []
-    cover_url: Optional[str] = None
+    tags: list[Text] = Field(default_factory=list)
+    cover_url: MediaReference | None = None
