@@ -164,6 +164,43 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("secret", response.text)
 
+    def test_get_comic_returns_requested_document_with_string_id(self):
+        identifier = ObjectId()
+        document = {
+            "_id": identifier, "title": "Obra", "author": "Julio",
+            "description": "Descrição", "tags": ["aventura"], "cover_url": None,
+        }
+        collection = self.database.get_collection.return_value
+        collection.find_one = AsyncMock(return_value=document.copy())
+        response = self.client.get(f"/api/comics/{str(identifier).upper()}")
+        self.assertEqual(response.status_code, 200)
+        expected = {key: value for key, value in document.items() if key != "_id"}
+        expected["id"] = str(identifier)
+        self.assertEqual(response.json(), expected)
+        self.database.get_collection.assert_called_once_with("catalogs")
+        collection.find_one.assert_awaited_once_with({"_id": identifier})
+
+    def test_get_comic_with_invalid_id_does_not_query_database(self):
+        for identifier in ("invalid", "a" * 23, "a" * 25, "z" * 24):
+            with self.subTest(identifier=identifier):
+                response = self.client.get(f"/api/comics/{identifier}")
+                self.assertEqual(response.status_code, 422)
+        self.database.get_collection.assert_not_called()
+
+    def test_get_comic_returns_404_when_not_found(self):
+        self.database.get_collection.return_value.find_one = AsyncMock(return_value=None)
+        response = self.client.get(f"/api/comics/{ObjectId()}")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"detail": "Obra não encontrada."})
+
+    def test_get_comic_database_failure_is_503_without_connection_details(self):
+        self.database.get_collection.return_value.find_one = AsyncMock(
+            side_effect=ServerSelectionTimeoutError("mongodb://user:secret@host")
+        )
+        response = self.client.get(f"/api/comics/{ObjectId()}")
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("secret", response.text)
+
 
 class ConcurrentRequestTests(unittest.IsolatedAsyncioTestCase):
     async def test_two_requests_can_wait_for_database_at_the_same_time(self):

@@ -30,6 +30,7 @@ A configuração padrão usa `mongodb://localhost:27017` e o banco `webcomics_db
 - `POST /api/comics`: cadastra uma obra validada e retorna 201, com `id` e `mensagem`, preservando o contrato iniciado por Julio.
 - Se o driver rejeitar um documento grande demais, o cadastro retorna 413. Esse tratamento não é um limite de tamanho do corpo HTTP: a requisição ainda é recebida e validada antes da tentativa de gravação.
 - `GET /api/comics`: retorna uma lista de até 100 obras ordenada por `id`. Aceita `limit` entre 1 e 100 e `after` com o ID da última obra recebida, para continuar a leitura sem carregar o catálogo inteiro. Dados inválidos retornam 422; falhas do banco retornam 503.
+- `GET /api/comics/{comic_id}`: retorna uma única obra pelo ID recebido no cadastro ou na listagem, com os mesmos campos de um item do catálogo. Retorna 404 se a obra não existir, 422 se o ID não for um ObjectId de 24 caracteres hexadecimais e 503 se o banco estiver indisponível. Exemplo: `GET /api/comics/507f1f77bcf86cd799439011` (use o ID de uma obra cadastrada).
 - Um cliente MongoDB por ciclo de execução da aplicação, compartilhado entre requisições e fechado no encerramento pelo lifespan do FastAPI.
 - Schemas de obra, capítulo e página com validação de textos obrigatórios, numeração positiva e datas com fuso horário. Campos desconhecidos são rejeitados para detectar erros de digitação.
 

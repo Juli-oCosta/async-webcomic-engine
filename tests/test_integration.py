@@ -4,6 +4,7 @@ import unittest
 from uuid import uuid4
 from unittest.mock import patch
 
+from bson import ObjectId
 from fastapi.testclient import TestClient
 from pymongo import MongoClient
 
@@ -35,6 +36,11 @@ class MongoIntegrationTests(unittest.TestCase):
                         self.assertEqual(response.status_code, 200)
                         first = response.json()
                         self.assertEqual(len(first), 100)
+                        details = client.get(f"/api/comics/{first[0]['id']}")
+                        self.assertEqual(details.status_code, 200)
+                        self.assertEqual(details.json(), first[0])
+                        self.assertEqual(client.get(f"/api/comics/{ObjectId()}").status_code, 404)
+                        self.assertEqual(client.get("/api/comics/invalid").status_code, 422)
                         response = client.get("/api/comics", params={"after": first[-1]["id"]})
                         self.assertEqual(response.status_code, 200)
                         second = response.json()

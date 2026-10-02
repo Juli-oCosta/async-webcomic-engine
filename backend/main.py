@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from bson import ObjectId
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
 from pymongo.errors import DocumentTooLarge, PyMongoError
 
@@ -82,3 +82,21 @@ async def list_comics(
     for comic in comics:
         comic["id"] = str(comic.pop("_id"))
     return comics
+
+
+@app.get(
+    "/api/comics/{comic_id}",
+    responses={
+        404: {"description": "Obra não encontrada"},
+        503: {"description": "MongoDB indisponível"},
+    },
+)
+async def get_comic(
+    comic_id: str = Path(pattern=r"^[0-9a-fA-F]{24}$"),
+    database=Depends(get_database),
+):
+    comic = await database.get_collection("catalogs").find_one({"_id": ObjectId(comic_id)})
+    if comic is None:
+        raise HTTPException(status_code=404, detail="Obra não encontrada.")
+    comic["id"] = str(comic.pop("_id"))
+    return comic
