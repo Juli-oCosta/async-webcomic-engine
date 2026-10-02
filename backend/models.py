@@ -22,13 +22,21 @@ class PageDocumentSchema(PageSchema):
     chapter_id: Text
 
 
-class ChapterSchema(DomainSchema):
-    comic_id: Text
-    chapter_number: int = Field(ge=1, strict=True)
+class ChapterCreateSchema(DomainSchema):
+    # Inteiro positivo compatível com o int64 do BSON.
+    chapter_number: int = Field(ge=1, le=2**63 - 1, strict=True)
     title: Text
+
+
+class ChapterSchema(ChapterCreateSchema):
+    comic_id: Text
     # A quantidade do subconjunto será definida junto das rotas de capítulos.
     initial_pages: list[PageSchema] = Field(default_factory=list)
     created_at: AwareDatetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ChapterResponseSchema(ChapterSchema):
+    id: Text
 
 
 class ComicSchema(DomainSchema):

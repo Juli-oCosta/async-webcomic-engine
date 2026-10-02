@@ -31,10 +31,25 @@ A configuração padrão usa `mongodb://localhost:27017` e o banco `webcomics_db
 - Se o driver rejeitar um documento grande demais, o cadastro retorna 413. Esse tratamento não é um limite de tamanho do corpo HTTP: a requisição ainda é recebida e validada antes da tentativa de gravação.
 - `GET /api/comics`: retorna uma lista de até 100 obras ordenada por `id`. Aceita `limit` entre 1 e 100 e `after` com o ID da última obra recebida, para continuar a leitura sem carregar o catálogo inteiro. Dados inválidos retornam 422; falhas do banco retornam 503.
 - `GET /api/comics/{comic_id}`: retorna uma única obra pelo ID recebido no cadastro ou na listagem, com os mesmos campos de um item do catálogo. Retorna 404 se a obra não existir, 422 se o ID não for um ObjectId de 24 caracteres hexadecimais e 503 se o banco estiver indisponível. Exemplo: `GET /api/comics/507f1f77bcf86cd799439011` (use o ID de uma obra cadastrada).
+- `POST /api/comics/{comic_id}/chapters`: cadastra um capítulo de uma obra existente. O corpo contém `chapter_number` (inteiro positivo) e `title` (não vazio). Retorna 201 com o capítulo criado, 404 para obra inexistente, 409 para número repetido na mesma obra, 422 para entrada inválida, 413 para documento grande demais ou 503 para falha de banco/preparação do índice.
 - Um cliente MongoDB por ciclo de execução da aplicação, compartilhado entre requisições e fechado no encerramento pelo lifespan do FastAPI.
 - Schemas de obra, capítulo e página com validação de textos obrigatórios, numeração positiva e datas com fuso horário. Campos desconhecidos são rejeitados para detectar erros de digitação.
 
 As coleções selecionadas são `catalogs`, `chapters` e `pages`. Selecioná-las no driver não cria documentos nem índices no MongoDB.
+
+## Cadastrar um capítulo
+
+Depois de cadastrar uma obra, envie `POST /api/comics/ID_DA_OBRA/chapters` com:
+
+```json
+{"chapter_number": 1, "title": "O começo"}
+```
+
+O servidor define `comic_id`, `created_at` em UTC e `initial_pages: []`, e devolve esses campos junto com `id`, `chapter_number` e `title`. Não envie `comic_id`, `created_at` ou `initial_pages` no corpo: o vínculo vem da URL e o cadastro de páginas será uma etapa separada.
+
+Capítulos são documentos separados da obra. Antes da primeira gravação por execução da API, é preparado um índice único em `(comic_id, chapter_number)`. Isso impede duplicatas também sob requisições simultâneas; obras diferentes podem ter o mesmo número de capítulo. A primeira gravação pode custar mais pela preparação do índice e deve ficar fora das medições de carga já aquecida. Consulte os [índices únicos do MongoDB](https://www.mongodb.com/docs/manual/core/index-unique/).
+
+Se houver dados antigos duplicados, o MongoDB recusará a criação do índice e a rota retornará 503 até esses dados serem revisados. A aplicação não remove dados automaticamente. Não remova esse índice durante a execução da API.
 
 ## Modelagem e Subset Pattern
 
@@ -44,7 +59,7 @@ As coleções selecionadas são `catalogs`, `chapters` e `pages`. Selecioná-las
 
 O armazenamento completo das páginas e a atualização do subconjunto ainda precisam ser implementados nas rotas de gravação. O objetivo é manter os documentos de capítulos pequenos, mesmo para obras longas. Uma projeção reduz os campos retornados por uma consulta, mas não contorna o limite de 16 MiB do documento armazenado. Consulte o [Subset Pattern do MongoDB](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/group-data/subset-pattern/).
 
-O cadastro de obras valida os dados com Pydantic. As rotas de capítulos e páginas, a sincronização do subconjunto e a validação de esquema diretamente no MongoDB ainda não foram implementadas. A quantidade de páginas precisará ser limitada pela política de gravação antes de armazenar capítulos extensos.
+Os cadastros de obras e capítulos validam os dados com Pydantic. A consulta de capítulos, as rotas de páginas, a sincronização do subconjunto e a validação de esquema diretamente no MongoDB ainda não foram implementadas. A quantidade de páginas precisará ser limitada pela política de gravação antes de armazenar capítulos extensos.
 
 ## Paginação do catálogo
 
@@ -75,9 +90,11 @@ O teste de integração cria um banco temporário com nome aleatório, cadastra 
 
 Também verifica a rejeição de um documento grande demais. O teste unitário de concorrência verifica se duas requisições conseguem aguardar operações de banco simultaneamente, com banco simulado; não mede throughput nem demonstra ganho de desempenho.
 
+Outro teste de integração cadastra capítulos em banco temporário e dispara duas tentativas simultâneas para o mesmo número na mesma obra: uma deve retornar 201 e a outra 409. Também verifica que o mesmo número em outra obra é aceito e que uma obra inexistente não recebe capítulos.
+
 ## Próximas etapas do TGI
 
-- Implementar persistência de capítulos/páginas, índices e rotas de leitura paginada, com limites por requisição.
+- Implementar leitura de capítulos, persistência de páginas, índices e rotas de leitura paginada, com limites por requisição.
 - Gerar dados sintéticos e integrar o leitor do front-end.
 - Comparar carregamento completo com carregamento sob demanda em condições controladas.
 - Medir memória do navegador, LCP, TBT e INP com interações reais. O JS Heap não representa toda a memória usada por imagens; TBT não substitui a medição de INP.

@@ -1,5 +1,7 @@
 """Teste opt-in do fluxo HTTP com MongoDB local, em banco temporário isolado."""
 import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 import unittest
 from uuid import uuid4
 from unittest.mock import patch
@@ -13,6 +15,49 @@ from backend.main import app
 
 @unittest.skipUnless(os.getenv("RUN_MONGO_TESTS") == "1", "Defina RUN_MONGO_TESTS=1 para MongoDB real")
 class MongoIntegrationTests(unittest.TestCase):
+    def test_chapter_creation_and_concurrent_duplicate_protection(self):
+        database_name = "tgi_validation_" + uuid4().hex
+        uri = "mongodb://localhost:27017"
+        with MongoClient(uri, serverSelectionTimeoutMS=5000, tz_aware=True) as cleanup_client:
+            cleanup_client.admin.command("ping")
+            self.assertNotIn(database_name, cleanup_client.list_database_names())
+            try:
+                with patch.dict(os.environ, {"MONGO_URL": uri, "MONGO_DB_NAME": database_name}):
+                    with TestClient(app) as client:
+                        comic_ids = []
+                        for title in ("Obra A", "Obra B"):
+                            response = client.post("/api/comics", json={"title": title, "author": "Teste", "description": ""})
+                            self.assertEqual(response.status_code, 201)
+                            comic_ids.append(response.json()["id"])
+                        payload = {"chapter_number": 1, "title": "Início"}
+                        # As primeiras gravações também disputam a preparação do índice.
+                        barrier = Barrier(2)
+                        def create_same_chapter():
+                            barrier.wait(timeout=5)
+                            return client.post(f"/api/comics/{comic_ids[0]}/chapters", json=payload)
+                        with ThreadPoolExecutor(max_workers=2) as executor:
+                            tasks = [executor.submit(create_same_chapter) for _ in range(2)]
+                            responses = [task.result(timeout=15) for task in tasks]
+                        self.assertEqual(sorted(r.status_code for r in responses), [201, 409])
+                        created = next(r.json() for r in responses if r.status_code == 201)
+                        stored = cleanup_client[database_name].chapters.find_one({"_id": ObjectId(created["id"])})
+                        self.assertEqual(stored["comic_id"], comic_ids[0])
+                        self.assertEqual(stored["chapter_number"], 1)
+                        self.assertEqual(stored["initial_pages"], [])
+                        self.assertIsNotNone(stored["created_at"].tzinfo)
+                        # O mesmo número em outra obra é permitido.
+                        self.assertEqual(client.post(f"/api/comics/{comic_ids[1]}/chapters", json=payload).status_code, 201)
+                        self.assertEqual(client.post(f"/api/comics/{comic_ids[0].upper()}/chapters", json=payload).status_code, 409)
+                        self.assertEqual(client.post(f"/api/comics/{ObjectId()}/chapters", json=payload).status_code, 404)
+                        self.assertEqual(cleanup_client[database_name].chapters.count_documents({}), 2)
+                        self.assertEqual(cleanup_client[database_name].pages.count_documents({}), 0)
+                        index = cleanup_client[database_name].chapters.index_information()["comic_chapter_number_unique"]
+                        self.assertTrue(index["unique"])
+                        self.assertEqual(index["key"], [("comic_id", 1), ("chapter_number", 1)])
+            finally:
+                cleanup_client.drop_database(database_name)
+                self.assertNotIn(database_name, cleanup_client.list_database_names())
+
     def test_create_and_paginate_more_than_one_hundred_comics(self):
         database_name = "tgi_validation_" + uuid4().hex
         uri = "mongodb://localhost:27017"

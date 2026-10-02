@@ -4,10 +4,10 @@ import logging
 from bson import ObjectId
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
-from pymongo.errors import DocumentTooLarge, PyMongoError
+from pymongo.errors import DocumentTooLarge, DuplicateKeyError, PyMongoError
 
-from backend.database import database_lifespan, get_database
-from backend.models import ComicSchema
+from backend.database import database_lifespan, ensure_chapter_index, get_database
+from backend.models import ChapterCreateSchema, ChapterResponseSchema, ChapterSchema, ComicSchema
 
 logger = logging.getLogger(__name__)
 DB_CHECK_TIMEOUT_SECONDS = 5
@@ -100,3 +100,36 @@ async def get_comic(
         raise HTTPException(status_code=404, detail="Obra não encontrada.")
     comic["id"] = str(comic.pop("_id"))
     return comic
+
+
+@app.post(
+    "/api/comics/{comic_id}/chapters",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ChapterResponseSchema,
+    responses={
+        404: {"description": "Obra não encontrada"},
+        409: {"description": "Número de capítulo já cadastrado nesta obra"},
+        413: {"description": "Documento excede o tamanho aceito pelo MongoDB"},
+        503: {"description": "MongoDB indisponível ou índice não preparado"},
+    },
+)
+async def create_chapter(
+    chapter: ChapterCreateSchema,
+    request: Request,
+    comic_id: str = Path(pattern=r"^[0-9a-fA-F]{24}$"),
+    database=Depends(get_database),
+):
+    parent_id = ObjectId(comic_id)
+    parent = await database.get_collection("catalogs").find_one({"_id": parent_id}, {"_id": 1})
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Obra não encontrada.")
+
+    await ensure_chapter_index(request, database)
+    document = ChapterSchema(comic_id=str(parent_id), **chapter.model_dump())
+    try:
+        result = await database.get_collection("chapters").insert_one(document.model_dump())
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Número de capítulo já cadastrado nesta obra.") from exc
+    except DocumentTooLarge as exc:
+        raise HTTPException(status_code=413, detail="Documento excede o tamanho aceito pelo MongoDB.") from exc
+    return ChapterResponseSchema(id=str(result.inserted_id), **document.model_dump())
