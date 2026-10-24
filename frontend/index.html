@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#162d2b">
+  <title>Entre Quadros — Leitor</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/js/observer.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#reading-area">Ir para a leitura</a>
+  <header class="topbar">
+    <a class="brand" href="/reader" aria-label="Entre Quadros, início">
+      <span class="brand-symbol" aria-hidden="true">▧</span> ENTRE QUADROS
+    </a>
+    <span class="prototype-label"><i aria-hidden="true"></i> Protótipo local · TGI</span>
+  </header>
+
+  <main class="layout">
+    <aside class="library" aria-labelledby="library-heading">
+      <p class="eyebrow">UM ESPAÇO PARA HISTÓRIAS</p>
+      <h1>Uma página.<br>Outro mundo.</h1>
+      <p class="intro">Escolha uma história e siga os quadros no seu ritmo.</p>
+
+      <div class="section-heading">
+        <h2 id="library-heading">Biblioteca</h2>
+        <button class="text-button" id="reload-catalog" type="button">Atualizar</button>
+      </div>
+      <p id="catalog-status" class="status" role="status" aria-live="polite">Buscando histórias…</p>
+      <div id="catalog" class="catalog"></div>
+      <button id="more-comics" class="secondary-button" type="button" hidden>Mais histórias</button>
+
+      <div class="library-note">
+        <span aria-hidden="true">↘</span>
+        <p>As imagens chegam conforme você avança pela leitura.</p>
+      </div>
+      <footer class="library-footer">Victor Hugo &amp; Julio Cesar<br>Ciência da Computação · UNICSUL</footer>
+    </aside>
+
+    <section id="reading-area" class="reading-area" aria-labelledby="work-title">
+      <div class="work-heading">
+        <p class="eyebrow">AGORA LENDO</p>
+        <h2 id="work-title">Sua próxima história</h2>
+        <p id="work-author" class="work-author">Selecione uma obra na biblioteca.</p>
+      </div>
+      <div class="reader-toolbar">
+        <div class="chapter-control">
+          <label for="chapters">Capítulo</label>
+          <select id="chapters" disabled><option value="">Escolha uma obra</option></select>
+          <button id="more-chapters" class="text-button" type="button" hidden>Mais capítulos</button>
+        </div>
+        <span class="reading-badge">Leitura sob demanda</span>
+      </div>
+
+      <div class="reader-message" id="reader-message" role="status" aria-live="polite">
+        <span class="message-symbol" aria-hidden="true">◇</span>
+        <p id="reader-status">Preparando sua leitura…</p>
+        <button id="retry-reader" class="secondary-button" type="button" hidden>Tentar novamente</button>
+      </div>
+      <div id="pages" class="pages" aria-label="Páginas do capítulo"></div>
+      <div id="page-sentinel" class="page-sentinel" aria-hidden="true" hidden></div>
+      <div class="reader-bottom">
+        <button id="more-pages" class="secondary-button" type="button" hidden>Carregar próximas páginas</button>
+        <p id="reading-progress" class="reading-progress" role="status" aria-live="polite"></p>
+      </div>
+      <p class="reading-footer">Fique mais um quadro.</p>
+    </section>
+  </main>
+  <noscript>Ative o JavaScript para carregar as obras e ler os capítulos.</noscript>
+</body>
+</html>

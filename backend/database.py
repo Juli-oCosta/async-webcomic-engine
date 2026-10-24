@@ -30,6 +30,8 @@ async def database_lifespan(app: FastAPI):
         app.state.pages_collection = database.get_collection("pages")
         app.state.chapter_index_ready = False
         app.state.chapter_index_lock = asyncio.Lock()
+        app.state.page_index_ready = False
+        app.state.page_index_lock = asyncio.Lock()
         yield
     finally:
         client.close()
@@ -57,3 +59,18 @@ async def ensure_chapter_index(request: Request, database):
                 name="comic_chapter_number_unique",
             )
             state.chapter_index_ready = True
+
+
+async def ensure_page_index(request: Request, database):
+    """Cada página é um documento pequeno e a numeração é única por capítulo."""
+    state = request.app.state
+    if state.page_index_ready:
+        return
+    async with state.page_index_lock:
+        if not state.page_index_ready:
+            await database.get_collection("pages").create_index(
+                [("chapter_id", 1), ("page_number", 1)],
+                unique=True,
+                name="chapter_page_number_unique",
+            )
+            state.page_index_ready = True

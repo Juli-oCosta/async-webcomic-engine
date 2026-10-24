@@ -1,0 +1,68 @@
+{
+  "dataset": "entre-quadros-demo-v1",
+  "synthetic": true,
+  "width": 900,
+  "height": 1200,
+  "files": [
+    {
+      "path": "/static/demo/page-01.svg",
+      "sha256": "98d8befbdc6e9be6da62455576e5c0782a752dd5e410a422c46e48a6d7b2800e",
+      "size_bytes": 2480
+    },
+    {
+      "path": "/static/demo/page-02.svg",
+      "sha256": "33051ee6e54d6f06363535dffada4f85a036f4000e7aff7b942dec06b0d48236",
+      "size_bytes": 2488
+    },
+    {
+      "path": "/static/demo/page-03.svg",
+      "sha256": "85ee1fe6b601d1b68befd2b006bfe2385da16d085a2826feb0180921f53dbcc9",
+      "size_bytes": 2472
+    },
+    {
+      "path": "/static/demo/page-04.svg",
+      "sha256": "ee687c3e8bd88a1b3538289f6e48b31f9df0b63eee3434882ed6af073a04e1be",
+      "size_bytes": 2476
+    },
+    {
+      "path": "/static/demo/page-05.svg",
+      "sha256": "5b5cc88f270532490a144840f02e29473b7cae088145d72b7f0e53a004e06cd6",
+      "size_bytes": 2478
+    },
+    {
+      "path": "/static/demo/page-06.svg",
+      "sha256": "7f1f941dd1785a7e56b80c2e730ea209f3c5d26cd29d193344959a42dc8bd810",
+      "size_bytes": 2480
+    },
+    {
+      "path": "/static/demo/page-07.svg",
+      "sha256": "93bda746cd2dd20c15a486aa6442ac3c93c56e1f6837fc5e23e4726fe67f7e9d",
+      "size_bytes": 2481
+    },
+    {
+      "path": "/static/demo/page-08.svg",
+      "sha256": "1f4e9d24ef6786d7e5274347f124292aa03007ddc7828a54dd02133196058d17",
+      "size_bytes": 2476
+    },
+    {
+      "path": "/static/demo/page-09.svg",
+      "sha256": "cbc17227da8f0bb175c0ad7f1d3e8093c69d31ca6ab8ba7bea1670bb1a1b83bf",
+      "size_bytes": 2493
+    },
+    {
+      "path": "/static/demo/page-10.svg",
+      "sha256": "eafc089a5d52ed3f53df6235f52a2e463db16aa1f31cc15f73ae120c359f19b4",
+      "size_bytes": 2486
+    },
+    {
+      "path": "/static/demo/page-11.svg",
+      "sha256": "4fff61428e2bc8dfb040ce16f75959818a5a27703b263bbaa10ad0f7da8fd9a2",
+      "size_bytes": 2489
+    },
+    {
+      "path": "/static/demo/page-12.svg",
+      "sha256": "45d350918755973ba63f18370f543273c303f08be2ef31dcdbe30ec4d868af4d",
+      "size_bytes": 2486
+    }
+  ]
+}

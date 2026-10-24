@@ -6,7 +6,7 @@ Prova de conceito do TGI sobre arquitetura assíncrona e gerenciamento de memór
 
 - Back-end: Python 3.10+, FastAPI, Uvicorn, Motor e Pydantic 2.
 - Banco: MongoDB local por padrão.
-- Front-end planejado: HTML, CSS e JavaScript com IntersectionObserver.
+- Front-end: HTML, CSS e JavaScript com IntersectionObserver e leitura paginada.
 
 ## Executar no Windows
 
@@ -22,6 +22,26 @@ Se o ambiente já existe, não é necessário criá-lo novamente. Abra http://12
 
 A configuração padrão usa `mongodb://localhost:27017` e o banco `webcomics_db`. Para alterar, copie `.env.example` para `.env` e edite `MONGO_URL` e `MONGO_DB_NAME`. Variáveis já definidas no ambiente têm prioridade. O arquivo `.env` não deve ser versionado.
 
+## Demonstrar o protótipo funcional
+
+Com o MongoDB local já em execução, na raiz do repositório:
+
+```powershell
+# Gera 12 imagens SVG sintéticas e prepara somente o banco de demonstração.
+.\.venv\Scripts\python.exe -B scripts/seed_database.py --database tgi_demo_local
+
+# Estas variáveis valem para o terminal atual; não edite seu banco permanente.
+$env:MONGO_URL = "mongodb://localhost:27017"
+$env:MONGO_DB_NAME = "tgi_demo_local"
+.\.venv\Scripts\python.exe -B -m uvicorn backend.main:app --host 127.0.0.1 --port 8765
+```
+
+Abra o [leitor local](http://127.0.0.1:8765/reader). O catálogo abre **O farol e a maré**, com oito páginas no primeiro capítulo, um segundo capítulo vazio e quatro páginas no terceiro. **Caderno em branco** demonstra uma obra sem capítulos. A preparação pode ser repetida: usa IDs e imagens determinísticos e substitui apenas seus documentos identificados, sem apagar bancos/coleções. Recusa nomes fora de `tgi_demo_*` e bancos existentes sem a identificação desta demonstração. O script usa MongoDB em localhost, não baixa mídias e não depende de serviços externos.
+
+`frontend/demo/manifest.json` identifica os 12 arquivos e seus hashes. São imagens vetoriais pequenas de demonstração, não uma massa de imagens pesadas para benchmark. As datas dos registros sintéticos são fixas. Não usar essa demonstração como prova de ganho de memória ou latência.
+
+Para retomar outro banco depois de encerrar o servidor, remova as variáveis desse terminal (`Remove-Item Env:MONGO_DB_NAME, Env:MONGO_URL`) ou abra um terminal novo. O leitor e a API usam a mesma origem, sem exigir servidor/CORS separado. A rota `/` continua retornando o JSON original; o leitor fica em `/reader`.
+
 ## Implementado
 
 - `/`: resposta inicial da API.
@@ -32,6 +52,10 @@ A configuração padrão usa `mongodb://localhost:27017` e o banco `webcomics_db
 - `GET /api/comics`: retorna uma lista de até 100 obras ordenada por `id`. Aceita `limit` entre 1 e 100 e `after` com o ID da última obra recebida, para continuar a leitura sem carregar o catálogo inteiro. Dados inválidos retornam 422; falhas do banco retornam 503.
 - `GET /api/comics/{comic_id}`: retorna uma única obra pelo ID recebido no cadastro ou na listagem, com os mesmos campos de um item do catálogo. Retorna 404 se a obra não existir, 422 se o ID não for um ObjectId de 24 caracteres hexadecimais e 503 se o banco estiver indisponível. Exemplo: `GET /api/comics/507f1f77bcf86cd799439011` (use o ID de uma obra cadastrada).
 - `POST /api/comics/{comic_id}/chapters`: cadastra um capítulo de uma obra existente. O corpo contém `chapter_number` (inteiro positivo) e `title` (não vazio). Retorna 201 com o capítulo criado, 404 para obra inexistente, 409 para número repetido na mesma obra, 422 para entrada inválida, 413 para documento grande demais ou 503 para falha de banco/preparação do índice.
+- `GET /api/comics/{comic_id}/chapters`: lista metadados de capítulos por número, com `limit` de 1 a 100 e cursor numérico `after`. Distingue obra inexistente (404) de obra sem capítulos (lista vazia).
+- `POST /api/chapters/{chapter_id}/pages`: grava uma referência de imagem com número e dimensões, vinculada a capítulo existente; numeração duplicada no capítulo retorna 409.
+- `GET /api/chapters/{chapter_id}/pages`: lista páginas em ordem, com `limit` de 1 a 100 e cursor numérico `after`; consulta sempre limitada ao capítulo.
+- `/reader` e `/static/...`: leitor e arquivos de `frontend/`. Paginação de metadados, imagens próximas da tela, troca de capítulo e estados vazios/falhas visíveis. Ver [contrato de leitura](docs/API-LEITURA.md).
 - Um cliente MongoDB por ciclo de execução da aplicação, compartilhado entre requisições e fechado no encerramento pelo lifespan do FastAPI.
 - Schemas de obra, capítulo e página com validação de textos obrigatórios, numeração positiva e datas com fuso horário. Campos desconhecidos são rejeitados para detectar erros de digitação.
 
@@ -57,15 +81,17 @@ Se houver dados antigos duplicados, o MongoDB recusará a criação do índice e
 
 `PageSchema` representa uma referência de imagem com número de página. `PageDocumentSchema` acrescenta `chapter_id` para armazenar páginas na coleção separada. As referências podem ser URLs ou caminhos relativos; não representam o conteúdo binário das imagens.
 
-O armazenamento completo das páginas e a atualização do subconjunto ainda precisam ser implementados nas rotas de gravação. O objetivo é manter os documentos de capítulos pequenos, mesmo para obras longas. Uma projeção reduz os campos retornados por uma consulta, mas não contorna o limite de 16 MiB do documento armazenado. Consulte o [Subset Pattern do MongoDB](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/group-data/subset-pattern/).
+O protótipo armazena as páginas separadamente em `pages`, sem anexar uma lista crescente ao capítulo. O campo `initial_pages` permanece vazio nos capítulos criados pela API: a sincronização do subconjunto não foi implementada nem é necessária para este fluxo. Uma projeção reduz os campos retornados por uma consulta, mas não contorna o limite de 16 MiB do documento armazenado. Consulte o [Subset Pattern do MongoDB](https://www.mongodb.com/docs/manual/data-modeling/design-patterns/group-data/subset-pattern/).
 
-Os cadastros de obras e capítulos validam os dados com Pydantic. A consulta de capítulos, as rotas de páginas, a sincronização do subconjunto e a validação de esquema diretamente no MongoDB ainda não foram implementadas. A quantidade de páginas precisará ser limitada pela política de gravação antes de armazenar capítulos extensos.
+Os cadastros de obras, capítulos e páginas validam os dados com Pydantic. As novas referências têm limite de 2048 caracteres, dimensões explícitas e uma página por documento; as consultas têm limite por requisição. A validação de esquema diretamente no MongoDB e a sincronização do subconjunto permanecem pendentes. O índice único `(chapter_id, page_number)` protege a numeração também sob escrita concorrente. Consulte o contrato para os limites e códigos de resposta.
 
 ## Paginação do catálogo
 
 A primeira chamada pode ser `GET /api/comics?limit=20`. Para continuar, use `GET /api/comics?limit=20&after=ID_DA_ULTIMA_OBRA`. O formato continua sendo uma lista JSON. Uma lista vazia indica o fim; se vierem menos itens que o limite, não há mais resultados naquele momento.
 
 O cursor é um ObjectId de 24 caracteres hexadecimais. A consulta usa o índice nativo de `_id`, com ordenação crescente; não é uma ordenação por título. Cadastros feitos durante a navegação podem aparecer nas páginas seguintes. Não se trata de uma fotografia fixa do catálogo.
+
+Nas novas rotas de leitura, os cursores seguem o número do capítulo/página. As respostas incluem `chapter_number_text` ou `page_number_text`, com os dígitos exatos em texto para uso no leitor e em `after`; os campos numéricos e o cadastro int64 anterior foram preservados. Isso evita perda de precisão no JavaScript para números altos. Ver [contrato de leitura](docs/API-LEITURA.md#numeração-exata-no-leitor-r2).
 
 As rotas de cadastro ainda não possuem autenticação: o servidor permanece voltado ao laboratório local do TGI.
 
@@ -92,11 +118,15 @@ Também verifica a rejeição de um documento grande demais. O teste unitário d
 
 Outro teste de integração cadastra capítulos em banco temporário e dispara duas tentativas simultâneas para o mesmo número na mesma obra: uma deve retornar 201 e a outra 409. Também verifica que o mesmo número em outra obra é aceito e que uma obra inexistente não recebe capítulos.
 
+O teste integrado do leitor cobre ordem/paginação de capítulos e páginas, isolamento entre pais, estado vazio e duas tentativas simultâneas de cadastrar a mesma página (201 e 409). Também usa banco temporário aleatório, removido ao terminar. Testes de arquivos estáticos verificam que o leitor responde e que `/static/` não expõe arquivos do repositório fora de `frontend/`. O navegador real é uma etapa de verificação separada de TestClient.
+
+As regressões de numeração exata e recuperação de mensagens do leitor podem ser executadas, com Node.js disponível, por `node tests/test_reader_regressions.cjs`. O script usa o JavaScript real em um DOM/fetch simulado; não é teste de navegador ou de desempenho. Node é usado apenas por esse teste, sem etapa de build ou dependência nova para executar o protótipo.
+
 ## Próximas etapas do TGI
 
-- Implementar leitura de capítulos, persistência de páginas, índices e rotas de leitura paginada, com limites por requisição.
-- Gerar dados sintéticos e integrar o leitor do front-end.
-- Comparar carregamento completo com carregamento sob demanda em condições controladas.
+- Confirmar o desenho experimental e a hipótese com Victor/orientadora.
+- Preparar uma massa de mídia e um protocolo adequados às medições, além das imagens sintéticas pequenas do protótipo.
+- Comparar estratégias em condições controladas, conforme a decisão experimental; o modo comparativo ainda não foi implementado.
 - Medir memória do navegador, LCP, TBT e INP com interações reais. O JS Heap não representa toda a memória usada por imagens; TBT não substitui a medição de INP.
 
 Remover elementos do DOM e referências JavaScript pode permitir a liberação de memória, mas não força coleta imediata. Ganhos de memória e concorrência precisam ser demonstrados pelos testes experimentais.

@@ -1,13 +1,16 @@
 import asyncio
 import logging
+from pathlib import Path as FilePath
 
 from bson import ObjectId
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pymongo.errors import DocumentTooLarge, DuplicateKeyError, PyMongoError
 
 from backend.database import database_lifespan, ensure_chapter_index, get_database
 from backend.models import ChapterCreateSchema, ChapterResponseSchema, ChapterSchema, ComicSchema
+from backend.reading import router as reading_router
 
 logger = logging.getLogger(__name__)
 DB_CHECK_TIMEOUT_SECONDS = 5
@@ -17,6 +20,14 @@ app = FastAPI(
     description="API Assíncrona para o TGI",
     lifespan=database_lifespan,
 )
+app.include_router(reading_router)
+FRONTEND_DIRECTORY = FilePath(__file__).resolve().parents[1] / "frontend"
+app.mount("/static", StaticFiles(directory=FRONTEND_DIRECTORY), name="static")
+
+
+@app.get("/reader", response_class=FileResponse, include_in_schema=False)
+async def reader():
+    return FileResponse(FRONTEND_DIRECTORY / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(PyMongoError)
