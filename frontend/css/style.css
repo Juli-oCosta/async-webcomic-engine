@@ -75,6 +75,17 @@ select { background: #f5f5ed; border: 1px solid #c8cfc2; border-radius: 5px; col
 .reader-bottom { padding: 30px 0 0; text-align: center; }
 .reading-progress { color: var(--muted); font-size: 11px; line-height: 1.7; }
 .reading-footer { text-align: center; color: #87917e; font-family: Georgia, serif; font-style: italic; font-size: 14px; margin: 30px 0 20px; }
+.experimental-reader .topbar,
+.experimental-reader .library,
+.experimental-reader .work-heading .eyebrow,
+.experimental-reader .reader-toolbar,
+.experimental-reader .reading-footer { display: none; }
+.experimental-reader .layout { display: block; max-width: 752px; min-height: 100vh; }
+.experimental-reader .reading-area { padding: 16px; }
+.experimental-reader .work-heading { margin-bottom: 12px; }
+.experimental-reader .work-heading h2 { font-size: 20px; overflow-wrap: anywhere; }
+.experimental-reader .work-author { margin: 4px 0 0; }
+.experimental-reader .page img { aspect-ratio: var(--page-ratio); }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 265px minmax(0, 1fr); }
   .library { padding: 36px 20px 20px; }
