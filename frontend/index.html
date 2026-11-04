@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#162d2b">
+  <meta name="theme-color" content="#18382f">
   <title>Entre Quadros — Leitor</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/css/style.css">
@@ -13,33 +13,41 @@
   <a class="skip-link" href="#reading-area">Ir para a leitura</a>
   <header class="topbar">
     <a class="brand" href="/reader" aria-label="Entre Quadros, início">
-      <span class="brand-symbol" aria-hidden="true">▧</span> ENTRE QUADROS
+      <svg class="brand-symbol" viewBox="0 0 40 40" fill="none" aria-hidden="true" focusable="false">
+        <path d="M5 7h13v26H5zM22 7h13v26H22z" stroke="currentColor" stroke-width="2"/>
+        <path d="M9 12h5M26 12h5M9 27h5M26 27h5" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span class="brand-copy"><span class="brand-name">Entre Quadros</span><span class="brand-caption">Histórias em sequência</span></span>
     </a>
-    <span class="prototype-label"><i aria-hidden="true"></i> Protótipo local · TGI</span>
+    <nav class="page-nav" aria-label="Navegação da página">
+      <a href="#library-panel">Biblioteca</a>
+      <a href="#reading-area">Leitura <span aria-hidden="true">↗</span></a>
+    </nav>
+    <span class="prototype-label">Protótipo · TGI</span>
   </header>
 
   <main class="layout">
-    <aside class="library" aria-labelledby="library-heading">
-      <p class="eyebrow">UM ESPAÇO PARA HISTÓRIAS</p>
-      <h1>Uma página.<br>Outro mundo.</h1>
-      <p class="intro">Escolha uma história e siga os quadros no seu ritmo.</p>
-
+    <aside id="library-panel" class="library" aria-labelledby="library-heading" tabindex="-1">
+      <p class="eyebrow">SEU PONTO DE PARTIDA</p>
+      <h1 id="library-heading">Biblioteca</h1>
+      <p class="intro">Escolha uma história.<br> O próximo quadro espera por você.</p>
       <div class="section-heading">
-        <h2 id="library-heading">Biblioteca</h2>
-        <button class="text-button" id="reload-catalog" type="button">Atualizar</button>
+        <h2>Histórias disponíveis</h2>
+        <button class="text-button" id="reload-catalog" type="button" aria-label="Atualizar biblioteca">Atualizar <span aria-hidden="true">↻</span></button>
       </div>
       <p id="catalog-status" class="status" role="status" aria-live="polite">Buscando histórias…</p>
-      <div id="catalog" class="catalog"></div>
+      <div id="catalog" class="catalog" role="group" aria-label="Obras disponíveis"></div>
       <button id="more-comics" class="secondary-button" type="button" hidden>Mais histórias</button>
+      <a class="library-jump" href="#reading-area">Ir para a história selecionada <span aria-hidden="true">↓</span></a>
 
       <div class="library-note">
-        <span aria-hidden="true">↘</span>
-        <p>As imagens chegam conforme você avança pela leitura.</p>
+        <span aria-hidden="true">01 /</span>
+        <p>Escolha a obra e o capítulo. Depois, siga a história página por página.</p>
       </div>
       <footer class="library-footer">Victor Hugo &amp; Julio Cesar<br>Ciência da Computação · UNICSUL</footer>
     </aside>
 
-    <section id="reading-area" class="reading-area" aria-labelledby="work-title">
+    <section id="reading-area" class="reading-area" aria-labelledby="work-title" tabindex="-1">
       <div class="work-heading">
         <p class="eyebrow">AGORA LENDO</p>
         <h2 id="work-title">Sua próxima história</h2>
@@ -51,23 +59,25 @@
           <select id="chapters" disabled><option value="">Escolha uma obra</option></select>
           <button id="more-chapters" class="text-button" type="button" hidden>Mais capítulos</button>
         </div>
-        <span class="reading-badge">Leitura sob demanda</span>
+        <span class="reading-badge">Leitor vertical</span>
       </div>
 
       <div class="reader-message" id="reader-message" role="status" aria-live="polite">
-        <span class="message-symbol" aria-hidden="true">◇</span>
+        <svg class="message-symbol" viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false">
+          <path d="M8 8h32v32H8zM15 16h18M15 24h12M15 32h18" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
         <p id="reader-status">Preparando sua leitura…</p>
         <button id="retry-reader" class="secondary-button" type="button" hidden>Tentar novamente</button>
       </div>
-      <div id="pages" class="pages" aria-label="Páginas do capítulo"></div>
+      <div id="pages" class="pages" role="group" aria-label="Páginas do capítulo"></div>
       <div id="page-sentinel" class="page-sentinel" aria-hidden="true" hidden></div>
       <div class="reader-bottom">
         <button id="more-pages" class="secondary-button" type="button" hidden>Carregar próximas páginas</button>
         <p id="reading-progress" class="reading-progress" role="status" aria-live="polite"></p>
       </div>
-      <p class="reading-footer">Fique mais um quadro.</p>
+      <p class="reading-footer"><span aria-hidden="true">—</span> Fique mais um quadro.</p>
     </section>
   </main>
-  <noscript>Ative o JavaScript para carregar as obras e ler os capítulos.</noscript>
+  <noscript class="noscript-message">Ative o JavaScript para carregar as obras e ler os capítulos.</noscript>
 </body>
 </html>

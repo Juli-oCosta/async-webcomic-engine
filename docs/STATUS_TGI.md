@@ -21,7 +21,7 @@
 
 ### Git e documentação
 
-- Em 04/11/2026, `main` e a referência local `origin/main` apontavam para `62e50d4`. `origin/HEAD` aponta para `origin/main`. `origin` está configurado para o [repositório público no GitHub](https://github.com/Juli-oCosta/async-webcomic-engine). A consulta direta por Git ao remoto falhou por conectividade, então a igualdade se refere às referências locais.
+- No inventário anterior à integração, em 04/11/2026, as referências locais apontavam para `62e50d4` e a consulta Git remota não estava disponível naquele ambiente. Depois, o PR #1 foi integrado na main em `d23a1db`, com autoria da integração de Victor e commit original de Julio preservado; fechamento e commit remoto foram conferidos. O redesign segue na branch separada `codex/design-leitor-20261104`, sem merge automático. `origin` continua no [repositório no GitHub](https://github.com/Juli-oCosta/async-webcomic-engine).
 - O status inicial sinalizou 12 SVGs no diretório `frontend/demo/`. O diff não mostrou alterações de conteúdo, o Git emitiu avisos LF/CRLF e os hashes conferiram com o manifesto. Registre a versão e os hashes dos recursos antes das medições.
 - O README local e o [contrato de leitura](API-LEITURA.md) descrevem as rotas e a paginação implementadas. No README, o exemplo de cadastro de capítulo ainda fala em cadastro de páginas como etapa futura, embora já exista `POST /api/chapters/{chapter_id}/pages`. O README usa `.venv` como exemplo, enquanto o ambiente existente usa `venv`. A página pública consultada ainda exibia um README que tratava o leitor e as rotas de páginas como planejados. A descrição pública apresenta ganho de RAM e desempenho como estabelecidos. Essas afirmações ainda precisam de evidência experimental. `docs/benchmarks/BENCHMARKS.MD` está vazio.
 
@@ -65,6 +65,7 @@ Em **04/11/2026**, a equipe verificou manualmente os dois modos no Google Chrome
 | 04/11/2026 | Inventário técnico e criação de `AGENTS.md` e deste registro. Reproduzidas as suítes JavaScript e Python com integração MongoDB desativada. Registradas as divergências documentais e a proposta de isolar o momento do carregamento das imagens. |
 | 04/11/2026 | Implementados os dois modos no leitor e registrada a metodologia aprovada. 25 regressões JavaScript passaram. Python teve 61 aprovados e 3 ignorados. O conteúdo de demonstração foi verificado por HTTP em leitura contra o MongoDB local. |
 | 04/11/2026 | A equipe confirmou no Chrome a exibição das imagens e o comportamento das requisições nos dois modos, com cache desativado. |
+| 04/11/2026 | PR #1 integrado na main em `d23a1db`. Nova rodada de design em branch separada: biblioteca compacta, marca, seleção, foco/contraste e layout responsivo, com HTML/CSS comuns aos modos. Passaram 25 cenários JS existentes e dois métodos de arquivos estáticos. Revisão própria em navegador integrado com viewports de desktop, 390 e 320 px; geometrias dos modos conferidas. Referências e limites em [referencias-ux-ui.md](referencias-ux-ui.md); continuidade em [ALTERACOES-2026-11-04.md](ALTERACOES-2026-11-04.md). Revisão independente desta branch e avaliação da dupla continuam pendentes. |
 
 Acrescente uma linha após cada tarefa significativa e atualize as seções afetadas com decisões, testes, limitações e novas pendências.
 
