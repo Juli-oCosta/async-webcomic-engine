@@ -5,13 +5,15 @@ const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const source = fs.readFileSync(path.join(__dirname, '..', 'frontend/js/observer.js'), 'utf8');
-assert.ok(source.trimEnd().endsWith('loadCatalog();'));
+const startup = 'startReader();';
+assert.ok(source.trimEnd().endsWith(startup));
 const checks = [];
 
 class Element {
   constructor(tag='div') {
     this.tag=tag; this.hidden=false; this.disabled=false; this.textContent=''; this.children=[];
     this.dataset={}; this.attributes={}; this.events={};
+    this.style={setProperty:(name,value)=>{this.style[name]=value;}};
     this.classList={toggle(){},add(){},remove(){}};
   }
   replaceChildren(...items){this.children=[...items];}
@@ -19,15 +21,96 @@ class Element {
   add(item){this.children.push(item);}
   addEventListener(name,fn){(this.events[name]??=[]).push(fn);}
   setAttribute(name,value){this.attributes[name]=value;}
+  hasAttribute(name){return Object.hasOwn(this.attributes,name);}
+  get src(){return this.attributes.src;}
+  set src(value){this.attributes.src=value;this.onSource?.(value);}
 }
-function setup(fetch) {
+function setup(fetch, { search = '', Observer, onSource } = {}) {
   const elements=new Map();
-  const context={document:{getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement(tag){return new Element(tag);}},
-    window:{addEventListener(){}},Option:function(text,value){this.text=text;this.value=value;},AbortController,fetch};
+  const context={document:{body:new Element('body'),getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement(tag){const element=new Element(tag);element.onSource=onSource;return element;}},
+    window:{location:{search},addEventListener(){}},Option:function(text,value){this.text=text;this.value=value;},AbortController,URLSearchParams,fetch};
+  if (Observer) context.IntersectionObserver=context.window.IntersectionObserver=Observer;
   vm.createContext(context);
-  vm.runInContext(source.trimEnd().slice(0,-'loadCatalog();'.length),context);
+  vm.runInContext(source.trimEnd().slice(0,-startup.length),context);
   vm.runInContext('state.work={id:"work",title:"Fronteira"};state.workController=new AbortController();state.pageController=new AbortController();state.chapter={id:"chapter",chapter_number:1,chapter_number_text:"1"};',context);
   return {context,elements,run:(code)=>vm.runInContext(code,context)};
+}
+
+async function experimentalModes() {
+  const results = [];
+  const rows = Array.from({length:100}, (_, i) => {
+    const number = String(9007199254740993n + BigInt(i));
+    return {page_number_text:number, image_url:`/static/demo/${i+1}.svg`, width:900+i, height:1200};
+  });
+  for (const mode of ['conventional', 'optimized']) {
+    const requests = [], sources = [], observers = [];
+    const chapter = '720000000000000000000003';
+    const env = setup(async (url) => {
+      requests.push(url);
+      assert.equal(env.elements.get('pages').children.length, 0);
+      assert.equal(sources.length, 0);
+      return {ok:true,json:async()=>requests.length === 1 ? rows : []};
+    }, {
+      search:`?mode=${mode}&chapter=${chapter}`,
+      onSource(value) {
+        assert.equal(env.elements.get('pages').children.length, rows.length);
+        sources.push(value);
+      },
+      Observer:class {
+        constructor(callback, options){this.callback=callback;this.options=options;this.targets=new Set();observers.push(this);}
+        observe(target){this.targets.add(target);}
+        unobserve(target){this.targets.delete(target);}
+        disconnect(){this.targets.clear();}
+        fire(...entries){this.callback(entries,this);}
+      },
+    });
+    await env.run(startup);
+    assert.deepEqual(requests, [0, rows.at(-1).page_number_text].map(after => `/api/chapters/${chapter}/pages?limit=100&after=${after}`));
+    const figures = env.elements.get('pages').children;
+    const images = figures.map(figure => figure.children[0].children[0]);
+    results.push(figures.map((figure,i) => [figure.tag, figure.children[0].tag, images[i].tag, figure.children[1].textContent,
+      images[i].alt, images[i].width, images[i].height, images[i].style['--page-ratio'], images[i].dataset.source]));
+    assert.deepEqual(figures.map(figure => figure.children[1].textContent), rows.map(row => `Página ${row.page_number_text}`));
+    assert.deepEqual(images.map(image => image.dataset.source), rows.map(row => row.image_url));
+    if (mode === 'conventional') {
+      assert.equal(observers.length,0);
+      assert.deepEqual(sources, rows.map(row => row.image_url));
+    } else {
+      assert.equal(observers.length,1);
+      const [observer] = observers;
+      assert.equal(observer.options.rootMargin,'500px 0px');
+      assert.deepEqual([...observer.targets],images);
+      observer.fire({target:images[0],isIntersecting:false});
+      assert.deepEqual(sources,[]);
+      const entry = {target:images[0],isIntersecting:true};
+      observer.fire(entry,entry);
+      assert.deepEqual(sources,[rows[0].image_url]);
+      assert.equal(observer.targets.has(images[0]),false);
+      env.run('resetReader()');
+      observer.fire({target:images[1],isIntersecting:true});
+      assert.equal(images[1].src,undefined);
+    }
+  }
+  assert.deepEqual(results[0],results[1]);
+  checks.push({name:'experimental_modes_share_complete_ordered_dom_and_control_src'});
+}
+
+async function experimentalRetry() {
+  const requests = [];
+  const env = setup(async (url) => {
+    requests.push(url);
+    if (requests.length === 2) return {ok:false,status:503};
+    return response(requests.length === 1 ? Array.from({length:100},(_,i)=>i+1) : [1], 'page_number');
+  }, {search:'?mode=conventional'});
+  await env.run(startup);
+  assert.equal(env.elements.get('pages').children.length,0);
+  assert.equal(env.elements.get('reader-message').hidden,false);
+  await env.elements.get('retry-reader').onclick();
+  assert.equal(requests[2],requests[0]);
+  assert.match(requests[0], /720000000000000000000001/);
+  assert.equal(env.elements.get('pages').children[0].children[0].children[0].src,'/static/demo/page-01.svg');
+  assert.equal(env.elements.get('reader-message').hidden,true);
+  checks.push({name:'experimental_failed_final_batch_restarts_without_partial_render'});
 }
 function response(rows,field) {
   // Deixa JSON.parse arredondar o campo legado: o leitor deve ignorá-lo para ordinais.
@@ -102,6 +185,22 @@ async function chapterRecovery(independent) {
   checks.push({name:'chapter_success_preserves_image_error'});
   assert.throws(()=>env.run('ordinalText({page_number:9007199254740993},"page_number")'));
   checks.push({name:'missing_exact_field_has_no_unsafe_numeric_fallback'});
+  await experimentalModes();
+  await experimentalRetry();
+  for (const [search, message] of [['?mode=other', /Modo inválido/], ['?mode=conventional&chapter=other', /identificador/], ['?mode=optimized', /requer IntersectionObserver/]]) {
+    const invalid = setup(() => assert.fail('Configuração inválida solicitou a API'), {search});
+    await invalid.run(startup);
+    assert.match(invalid.elements.get('reader-status').textContent,message);
+    checks.push({name:`experimental_rejects_${search}`});
+  }
+  const originalRequests = [];
+  const original = setup(async (url) => {
+    originalRequests.push(url);
+    return response([], 'page_number');
+  });
+  await original.run(startup);
+  assert.deepEqual(originalRequests,['/api/comics?limit=20']);
+  checks.push({name:'reader_without_mode_starts_original_catalog'});
   const result={method:'Node VM + fake DOM/fetch; not browser/HTTP/MongoDB',sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),passed:checks.length,checks};
   if(process.argv[2])fs.writeFileSync(process.argv[2],JSON.stringify(result,null,2)+'\n');
   console.log(JSON.stringify({passed:checks.length,failed:0,sourceSha256:result.sourceSha256}));

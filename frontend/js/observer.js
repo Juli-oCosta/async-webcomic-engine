@@ -16,6 +16,8 @@ const state = {
 };
 const CATALOG_BATCH = 20;
 const PAGE_BATCH = 4;
+const EXPERIMENT_PAGE_BATCH = 100;
+const DEMO_CHAPTER_ID = "720000000000000000000001";
 
 async function fetchJSON(path, signal) {
   const response = await fetch(path, { signal, headers: { Accept: "application/json" } });
@@ -190,12 +192,13 @@ async function loadChapters(reset = false) {
 
 function createPage(page, version) {
   const pageNumber = ordinalText(page, "page_number");
-  const chapterNumber = ordinalText(state.chapter, "chapter_number");
+  const chapterLabel = state.chapter.label ?? `${state.work.title}, capítulo ${ordinalText(state.chapter, "chapter_number")}`;
   const figure = document.createElement("figure"); figure.className = "page";
   const wrap = document.createElement("div"); wrap.className = "page-image-wrap";
   const image = document.createElement("img");
-  image.alt = `${state.work.title}, capítulo ${chapterNumber}, página ${pageNumber}`;
+  image.alt = `${chapterLabel}, página ${pageNumber}`;
   image.width = page.width; image.height = page.height; image.decoding = "async";
+  image.style.setProperty("--page-ratio", `${page.width} / ${page.height}`);
   image.dataset.source = page.image_url;
   const errorBox = document.createElement("div"); errorBox.className = "image-error"; errorBox.hidden = true;
   errorBox.setAttribute("role", "alert");
@@ -219,8 +222,88 @@ function createPage(page, version) {
   errorBox.append(errorText, retry); wrap.append(image, errorBox);
   const caption = document.createElement("figcaption"); caption.textContent = `Página ${pageNumber.padStart(2, "0")}`;
   figure.append(wrap, caption); ui.pages.append(figure);
+  return image;
+}
+
+function activateImage(image) {
   if (state.imageObserver) state.imageObserver.observe(image);
   else image.src = image.dataset.source;
+}
+
+function observeImages(version, signal) {
+  return new IntersectionObserver((entries, observer) => {
+    if (version !== state.readerVersion || signal.aborted) return;
+    for (const entry of entries) if (entry.isIntersecting && !entry.target.hasAttribute("src")) {
+      observer.unobserve(entry.target);
+      entry.target.src = entry.target.dataset.source;
+    }
+  }, { rootMargin: "500px 0px" });
+}
+
+async function loadExperimentalChapter(chapterId, optimized) {
+  resetReader();
+  const version = state.readerVersion;
+  const { signal } = state.pageController;
+  const label = chapterId === DEMO_CHAPTER_ID ? "A luz da ilha" : `Capítulo ${chapterId}`;
+  state.chapter = { id: chapterId, label };
+  ui["work-title"].textContent = label;
+  readerMessage("Abrindo o capítulo…", false, null, "pages");
+
+  try {
+    const pages = [];
+    let after = "0";
+    while (true) {
+      const batch = await fetchJSON(`/api/chapters/${chapterId}/pages?limit=${EXPERIMENT_PAGE_BATCH}&after=${after}`, signal);
+      if (signal.aborted || version !== state.readerVersion) return;
+      for (const page of batch) {
+        const number = ordinalText(page, "page_number");
+        if (BigInt(number) <= BigInt(after)) throw new Error("A sequência de páginas do capítulo é inválida.");
+        after = number;
+        pages.push(page);
+      }
+      if (batch.length < EXPERIMENT_PAGE_BATCH) break;
+    }
+    if (!pages.length) {
+      readerMessage("Este capítulo ainda não tem páginas.", false, null, "pages");
+      return;
+    }
+
+    const images = pages.map((page) => createPage(page, version));
+    state.pageCount = pages.length;
+    state.pagesDone = true;
+    clearReaderMessage("pages");
+    updateProgress();
+    if (optimized) state.imageObserver = observeImages(version, signal);
+    images.forEach(activateImage);
+  } catch (error) {
+    if (!signal.aborted && version === state.readerVersion)
+      readerMessage(error.message, true, () => loadExperimentalChapter(chapterId, optimized), "pages");
+  }
+}
+
+function startReader() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+  if (mode === null) return loadCatalog();
+
+  document.body.classList.add("experimental-reader");
+  ui["work-title"].textContent = "Capítulo experimental";
+  if (mode !== "conventional" && mode !== "optimized") {
+    readerMessage("Modo inválido. Use conventional ou optimized.", true);
+    return;
+  }
+  const optimized = mode === "optimized";
+  ui["work-author"].textContent = optimized ? "Modo otimizado" : "Modo convencional";
+  const chapterId = (params.get("chapter") ?? DEMO_CHAPTER_ID).toLowerCase();
+  if (!/^[0-9a-f]{24}$/.test(chapterId)) {
+    readerMessage("O identificador do capítulo deve ter 24 dígitos hexadecimais.", true);
+    return;
+  }
+  if (optimized && !("IntersectionObserver" in window)) {
+    readerMessage("O modo otimizado requer IntersectionObserver neste navegador.", true);
+    return;
+  }
+  return loadExperimentalChapter(chapterId, optimized);
 }
 
 async function selectChapter(chapter) {
@@ -228,12 +311,7 @@ async function selectChapter(chapter) {
   resetReader(); state.chapter = chapter; ui.chapters.value = chapter.id;
   const version = state.readerVersion;
   if ("IntersectionObserver" in window) {
-    state.imageObserver = new IntersectionObserver((entries, observer) => {
-      for (const entry of entries) if (entry.isIntersecting) {
-        observer.unobserve(entry.target);
-        if (version === state.readerVersion) entry.target.src = entry.target.dataset.source;
-      }
-    }, { rootMargin: "500px 0px" });
+    state.imageObserver = observeImages(version, state.pageController.signal);
     state.moreObserver = new IntersectionObserver((entries) => {
       if (version === state.readerVersion && entries.some((entry) => entry.isIntersecting) && !state.pagesFailed) loadPages();
     }, { rootMargin: "400px 0px" });
@@ -251,7 +329,7 @@ async function loadPages() {
   try {
     const pages = await fetchJSON(`/api/chapters/${state.chapter.id}/pages?limit=${PAGE_BATCH}&after=${state.pageAfter}`, state.pageController.signal);
     if (version !== state.readerVersion) return;
-    for (const page of pages) createPage(page, version);
+    for (const page of pages) activateImage(createPage(page, version));
     state.pageCount += pages.length;
     if (pages.length) state.pageAfter = ordinalText(pages.at(-1), "page_number");
     state.pagesDone = pages.length < PAGE_BATCH;
@@ -283,4 +361,4 @@ window.addEventListener("pagehide", () => {
   state.catalogController?.abort(); state.workController?.abort(); state.pageController?.abort();
   state.imageObserver?.disconnect(); state.moreObserver?.disconnect();
 });
-loadCatalog();
+startReader();
